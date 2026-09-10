@@ -131,10 +131,20 @@ fun MainScreen(viewModel: MainViewModel) {
                 composable(Routes.ANALYTICS) { AnalyticsScreen(viewModel) }
                 composable(Routes.REPORTS) { ReportsScreen(viewModel) }
                 composable(Routes.SETTINGS) {
-                    SettingsScreen(viewModel) { navController.navigate(Routes.SEMESTER_HISTORY) }
+                    SettingsScreen(
+                        viewModel = viewModel,
+                        onOpenSemesterHistory = { navController.navigate(Routes.SEMESTER_HISTORY) },
+                        onOpenAttendanceHistory = { navController.navigate(Routes.ATTENDANCE_HISTORY) }
+                    )
                 }
                 composable(Routes.SEMESTER_HISTORY) {
                     SemesterHistoryScreen(viewModel) { navController.navigate(Routes.ANALYTICS) }
+                }
+                composable(Routes.ATTENDANCE_HISTORY) {
+                    AttendanceHistoryScreen(viewModel) { date ->
+                        viewModel.changeSelectedDate(date)
+                        navController.navigate(Routes.TODAY) { launchSingleTop = true }
+                    }
                 }
             }
         }
@@ -216,4 +226,5 @@ private object Routes {
     const val REPORTS = "reports"
     const val SETTINGS = "settings"
     const val SEMESTER_HISTORY = "semester-history"
+    const val ATTENDANCE_HISTORY = "attendance-history"
 }
