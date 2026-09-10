@@ -7,6 +7,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
@@ -128,9 +129,19 @@ class BackupRestoreHelper(private val db: AppDatabase) {
 
     private fun readLimited(inputStream: InputStream): String {
         inputStream.use { input ->
-            val bytes = input.readBytes(MAX_BACKUP_BYTES + 1)
-            require(bytes.size <= MAX_BACKUP_BYTES) { "Backup file is too large" }
-            return bytes.toString(Charsets.UTF_8)
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            var total = 0
+
+            while (true) {
+                val read = input.read(buffer)
+                if (read == -1) break
+                total += read
+                require(total <= MAX_BACKUP_BYTES) { "Backup file is too large" }
+                output.write(buffer, 0, read)
+            }
+
+            return output.toString(Charsets.UTF_8.name())
         }
     }
 
