@@ -2,6 +2,7 @@ package com.example.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.*
@@ -21,7 +22,6 @@ import com.example.UniLecaApplication
 import com.example.data.model.AttendanceStatus
 import com.example.data.model.HeldStatus
 import com.example.data.model.TimetableSlotWithModule
-import com.ishara.unileca.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -50,10 +50,10 @@ class AttendanceWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetContent(session: TimetableSlotWithModule?, isLoading: Boolean) {
-        val primary = ColorProvider(R.color.widget_primary)
-        val background = ColorProvider(R.color.white)
-        val text = ColorProvider(R.color.widget_text)
-        val white = ColorProvider(R.color.white)
+        val primary = ColorProvider(Color(0xFF0288D1))
+        val background = ColorProvider(Color.White)
+        val text = ColorProvider(Color(0xFF334155))
+        val white = ColorProvider(Color.White)
 
         Column(
             modifier = GlanceModifier.fillMaxSize().background(background).padding(8.dp)
