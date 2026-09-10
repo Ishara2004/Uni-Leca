@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -27,46 +26,33 @@ class AttendanceRepository(private val db: AppDatabase) {
     suspend fun createSemester(name: String, duplicateFromId: Int? = null): Long = db.withTransaction {
         val now = System.currentTimeMillis()
         semesterDao.endAllActiveSemesters(now)
-        val newId = semesterDao.insertSemester(
-            Semester(name = name.trim(), status = SemesterStatus.ACTIVE.dbValue)
-        ).toInt()
+        val newId = semesterDao.insertSemester(Semester(name = name.trim(), status = SemesterStatus.ACTIVE.dbValue)).toInt()
         if (duplicateFromId != null) duplicateSemesterInternal(duplicateFromId, newId)
         newId.toLong()
     }
 
     suspend fun updateSemester(semester: Semester) = semesterDao.updateSemester(semester)
-
     suspend fun deleteSemester(semesterId: Int) = db.withTransaction {
         semesterDao.getSemesterById(semesterId)?.let { semesterDao.deleteSemester(it) }
     }
 
     suspend fun endSemester(id: Int) {
         semesterDao.getSemesterById(id)?.let {
-            semesterDao.updateSemester(
-                it.copy(status = SemesterStatus.ENDED.dbValue, endedDate = System.currentTimeMillis())
-            )
+            semesterDao.updateSemester(it.copy(status = SemesterStatus.ENDED.dbValue, endedDate = System.currentTimeMillis()))
         }
     }
 
-    fun getModulesForSemester(semesterId: Int): Flow<List<Module>> =
-        moduleDao.getModulesForSemester(semesterId)
+    fun getModulesForSemester(semesterId: Int): Flow<List<Module>> = moduleDao.getModulesForSemester(semesterId)
 
     suspend fun insertModule(semesterId: Int, name: String, threshold: Float): Long =
-        moduleDao.insertModule(
-            Module(
-                semesterId = semesterId,
-                name = name.trim(),
-                attendanceThreshold = threshold.coerceIn(0f, 100f)
-            )
-        )
+        moduleDao.insertModule(Module(semesterId = semesterId, name = name.trim(), attendanceThreshold = threshold.coerceIn(0f, 100f)))
 
     suspend fun updateModule(module: Module) = moduleDao.updateModule(module)
 
     suspend fun deleteModule(module: Module) = db.withTransaction {
         val historyCount = attendanceDao.countEntriesForModule(module.id)
-        if (historyCount == 0) {
-            moduleDao.deleteModule(module)
-        } else {
+        if (historyCount == 0) moduleDao.deleteModule(module)
+        else {
             val now = System.currentTimeMillis()
             moduleDao.archiveModule(module.id, now)
             slotDao.archiveSlotsForModule(module.id, now)
@@ -82,18 +68,11 @@ class AttendanceRepository(private val db: AppDatabase) {
             val day = localDate.dayOfWeek.value
             slots.filter { item ->
                 val slot = item.slot
-                (slot.isRecurring && slot.dayOfWeek == day) ||
-                    (!slot.isRecurring && slot.specificDate == date)
+                (slot.isRecurring && slot.dayOfWeek == day) || (!slot.isRecurring && slot.specificDate == date)
             }.sortedBy { toMinutes(it.slot.startTime) }
         }
 
-    suspend fun insertRecurringSlot(
-        moduleId: Int,
-        dayOfWeek: Int,
-        startTime: String,
-        endTime: String,
-        sessionType: String
-    ): Long {
+    suspend fun insertRecurringSlot(moduleId: Int, dayOfWeek: Int, startTime: String, endTime: String, sessionType: String): Long {
         requireValidTimeRange(startTime, endTime)
         return slotDao.insertSlot(
             TimetableSlot(
@@ -108,13 +87,7 @@ class AttendanceRepository(private val db: AppDatabase) {
         )
     }
 
-    suspend fun insertExtraSession(
-        moduleId: Int,
-        date: String,
-        startTime: String,
-        endTime: String,
-        sessionType: String
-    ): Long {
+    suspend fun insertExtraSession(moduleId: Int, date: String, startTime: String, endTime: String, sessionType: String): Long {
         val parsedDate = LocalDate.parse(date)
         requireValidTimeRange(startTime, endTime)
         return slotDao.insertSlot(
@@ -132,35 +105,22 @@ class AttendanceRepository(private val db: AppDatabase) {
 
     suspend fun updateSlot(slot: TimetableSlot) {
         requireValidTimeRange(slot.startTime, slot.endTime)
-        slotDao.updateSlot(
-            slot.copy(
-                startTime = normalizeTime(slot.startTime),
-                endTime = normalizeTime(slot.endTime),
-                sessionType = SessionType.normalize(slot.sessionType)
-            )
-        )
+        slotDao.updateSlot(slot.copy(startTime = normalizeTime(slot.startTime), endTime = normalizeTime(slot.endTime), sessionType = SessionType.normalize(slot.sessionType)))
     }
 
     suspend fun deleteSlot(slot: TimetableSlot) {
         val historyCount = attendanceDao.countEntriesForSlot(slot.id)
-        if (historyCount == 0) slotDao.deleteSlot(slot)
-        else slotDao.archiveSlot(slot.id, System.currentTimeMillis())
+        if (historyCount == 0) slotDao.deleteSlot(slot) else slotDao.archiveSlot(slot.id, System.currentTimeMillis())
     }
 
-    suspend fun getSlotWithModule(slotId: Int): TimetableSlotWithModule? =
-        slotDao.getSlotWithModuleById(slotId)
-
-    fun getAttendanceDetailsForSemester(semesterId: Int): Flow<List<AttendanceDetail>> =
-        attendanceDao.getAttendanceDetailsForSemester(semesterId)
-
-    fun getAttendanceDetailsForDate(semesterId: Int, date: String): Flow<List<AttendanceDetail>> =
-        attendanceDao.getAttendanceDetailsForDate(semesterId, date)
+    suspend fun getSlotWithModule(slotId: Int): TimetableSlotWithModule? = slotDao.getSlotWithModuleById(slotId)
+    fun getAttendanceDetailsForSemester(semesterId: Int): Flow<List<AttendanceDetail>> = attendanceDao.getAttendanceDetailsForSemester(semesterId)
+    fun getAttendanceDetailsForDate(semesterId: Int, date: String): Flow<List<AttendanceDetail>> = attendanceDao.getAttendanceDetailsForDate(semesterId, date)
 
     suspend fun markAttendance(slotId: Int, date: String, heldStatus: String, attendanceStatus: String) {
         val slot = slotDao.getSlotById(slotId) ?: return
         if (slot.archivedAt != null) return
         if (!slot.isRecurring && slot.specificDate != date) return
-
         val existing = attendanceDao.getEntryForSlotAndDate(slotId, date)
         attendanceDao.upsertAttendanceEntry(
             AttendanceEntry(
@@ -173,26 +133,24 @@ class AttendanceRepository(private val db: AppDatabase) {
         )
     }
 
-    suspend fun clearAttendance(slotId: Int, date: String) =
-        attendanceDao.deleteEntryForSlotAndDate(slotId, date)
+    suspend fun clearAttendance(slotId: Int, date: String) = attendanceDao.deleteEntryForSlotAndDate(slotId, date)
 
-    fun getModuleAttendanceStats(semesterId: Int): Flow<List<ModuleAttendanceStats>> {
+    fun getModuleAttendanceStats(semesterId: Int, medicalCountsAsAttended: Boolean = true): Flow<List<ModuleAttendanceStats>> {
         val modulesFlow = moduleDao.getAllModulesForSemesterFlow(semesterId)
         val entriesFlow = attendanceDao.getAttendanceDetailsForSemester(semesterId)
-
         return combine(modulesFlow, entriesFlow) { modules, entries ->
             val entriesByModule = entries.groupBy { it.moduleId }
             modules.mapNotNull { module ->
                 val moduleEntries = entriesByModule[module.id].orEmpty()
                 if (module.isArchived && moduleEntries.isEmpty()) return@mapNotNull null
-                buildModuleStats(module, moduleEntries)
+                buildModuleStats(module, moduleEntries, medicalCountsAsAttended)
             }
         }
     }
 
-    fun calculateRisk(stat: ModuleAttendanceStats): AttendanceRisk {
-        val held = stat.heldCount
-        val attended = stat.presentCount + stat.medicalCount
+    fun calculateRisk(stat: ModuleAttendanceStats, medicalCountsAsAttended: Boolean = true): AttendanceRisk {
+        val held = if (medicalCountsAsAttended) stat.heldCount else (stat.heldCount - stat.medicalCount).coerceAtLeast(0)
+        val attended = stat.presentCount + if (medicalCountsAsAttended) stat.medicalCount else 0
         val threshold = stat.module.attendanceThreshold
         if (held == 0) return AttendanceRisk(null, null, 0, 0)
 
@@ -212,39 +170,19 @@ class AttendanceRepository(private val db: AppDatabase) {
                 if (pct >= threshold) break
             }
         }
-
         return AttendanceRisk(stat.percentage, afterMiss, allowedMisses, recover)
     }
 
-    suspend fun duplicateSemester(fromSemesterId: Int, toSemesterId: Int) =
-        db.withTransaction { duplicateSemesterInternal(fromSemesterId, toSemesterId) }
+    suspend fun duplicateSemester(fromSemesterId: Int, toSemesterId: Int) = db.withTransaction { duplicateSemesterInternal(fromSemesterId, toSemesterId) }
 
     private suspend fun duplicateSemesterInternal(fromSemesterId: Int, toSemesterId: Int) {
         val modules = moduleDao.getModulesForSemesterSync(fromSemesterId)
-        val slots = slotDao.getSlotsWithModuleForSemesterSync(fromSemesterId)
-            .filter { it.slot.isRecurring }
-
+        val slots = slotDao.getSlotsWithModuleForSemesterSync(fromSemesterId).filter { it.slot.isRecurring }
         for (module in modules) {
-            val newModuleId = moduleDao.insertModule(
-                Module(
-                    semesterId = toSemesterId,
-                    name = module.name,
-                    attendanceThreshold = module.attendanceThreshold
-                )
-            ).toInt()
-
+            val newModuleId = moduleDao.insertModule(Module(semesterId = toSemesterId, name = module.name, attendanceThreshold = module.attendanceThreshold)).toInt()
             slots.filter { it.slot.moduleId == module.id }.forEach { item ->
                 val old = item.slot
-                slotDao.insertSlot(
-                    TimetableSlot(
-                        moduleId = newModuleId,
-                        dayOfWeek = old.dayOfWeek,
-                        startTime = old.startTime,
-                        endTime = old.endTime,
-                        sessionType = old.sessionType,
-                        isRecurring = true
-                    )
-                )
+                slotDao.insertSlot(TimetableSlot(moduleId = newModuleId, dayOfWeek = old.dayOfWeek, startTime = old.startTime, endTime = old.endTime, sessionType = old.sessionType, isRecurring = true))
             }
         }
     }
@@ -253,42 +191,35 @@ class AttendanceRepository(private val db: AppDatabase) {
         val active = getActiveSemesterSync() ?: return@withContext null
         val today = LocalDate.now()
         val now = LocalTime.now()
-        val slots = slotDao.getSlotsWithModuleForSemesterSync(active.id)
+        slotDao.getSlotsWithModuleForSemesterSync(active.id)
             .filter { item ->
                 val s = item.slot
-                (s.isRecurring && s.dayOfWeek == today.dayOfWeek.value) ||
-                    (!s.isRecurring && s.specificDate == today.toString())
+                (s.isRecurring && s.dayOfWeek == today.dayOfWeek.value) || (!s.isRecurring && s.specificDate == today.toString())
             }
             .sortedBy { toMinutes(it.slot.startTime) }
-
-        slots.firstOrNull { item ->
-            runCatching { LocalTime.parse(item.slot.endTime) }.getOrNull()?.isAfter(now) == true
-        }
+            .firstOrNull { item -> runCatching { LocalTime.parse(item.slot.endTime) }.getOrNull()?.isAfter(now) == true }
     }
 
-    private fun buildModuleStats(module: Module, details: List<AttendanceDetail>): ModuleAttendanceStats {
+    private fun buildModuleStats(module: Module, details: List<AttendanceDetail>, medicalCountsAsAttended: Boolean): ModuleAttendanceStats {
         val heldEntries = details.filter { it.entry.heldStatus == HeldStatus.HELD.dbValue }
         val present = heldEntries.count { it.entry.attendanceStatus == AttendanceStatus.PRESENT.dbValue }
         val medical = heldEntries.count { it.entry.attendanceStatus == AttendanceStatus.MEDICAL.dbValue }
         val absent = heldEntries.count { it.entry.attendanceStatus == AttendanceStatus.ABSENT.dbValue }
-        val percentage = percentageOrNull(present + medical, heldEntries.size)
+        val percentage = percentageFor(present, medical, absent, medicalCountsAsAttended)
 
-        val typeStats = heldEntries
-            .groupBy { SessionType.normalize(it.slot.sessionType) }
-            .map { (type, typeEntries) ->
-                val typePresent = typeEntries.count { it.entry.attendanceStatus == AttendanceStatus.PRESENT.dbValue }
-                val typeMedical = typeEntries.count { it.entry.attendanceStatus == AttendanceStatus.MEDICAL.dbValue }
-                val typeAbsent = typeEntries.count { it.entry.attendanceStatus == AttendanceStatus.ABSENT.dbValue }
-                SessionTypeAttendanceStats(
-                    sessionType = type,
-                    heldCount = typeEntries.size,
-                    presentCount = typePresent,
-                    medicalCount = typeMedical,
-                    absentCount = typeAbsent,
-                    percentage = percentageOrNull(typePresent + typeMedical, typeEntries.size)
-                )
-            }
-            .sortedBy { it.sessionType }
+        val typeStats = heldEntries.groupBy { SessionType.normalize(it.slot.sessionType) }.map { (type, typeEntries) ->
+            val typePresent = typeEntries.count { it.entry.attendanceStatus == AttendanceStatus.PRESENT.dbValue }
+            val typeMedical = typeEntries.count { it.entry.attendanceStatus == AttendanceStatus.MEDICAL.dbValue }
+            val typeAbsent = typeEntries.count { it.entry.attendanceStatus == AttendanceStatus.ABSENT.dbValue }
+            SessionTypeAttendanceStats(
+                sessionType = type,
+                heldCount = typeEntries.size,
+                presentCount = typePresent,
+                medicalCount = typeMedical,
+                absentCount = typeAbsent,
+                percentage = percentageFor(typePresent, typeMedical, typeAbsent, medicalCountsAsAttended)
+            )
+        }.sortedBy { it.sessionType }
 
         return ModuleAttendanceStats(
             module = module,
@@ -302,8 +233,12 @@ class AttendanceRepository(private val db: AppDatabase) {
         )
     }
 
-    private fun percentageOrNull(attended: Int, held: Int): Float? =
-        if (held == 0) null else attended.toFloat() / held * 100f
+    private fun percentageFor(present: Int, medical: Int, absent: Int, medicalCountsAsAttended: Boolean): Float? {
+        val denominator = present + absent + if (medicalCountsAsAttended) medical else 0
+        if (denominator == 0) return null
+        val attended = present + if (medicalCountsAsAttended) medical else 0
+        return attended.toFloat() / denominator * 100f
+    }
 
     private fun requireValidTimeRange(start: String, end: String) {
         val startTime = LocalTime.parse(normalizeTime(start))
