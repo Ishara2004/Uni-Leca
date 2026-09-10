@@ -25,24 +25,29 @@ import com.ishara.unileca.R
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(viewModel: MainViewModel, onOpenSemesterHistory: () -> Unit) {
+fun SettingsScreen(
+    viewModel: MainViewModel,
+    onOpenSemesterHistory: () -> Unit,
+    onOpenAttendanceHistory: () -> Unit
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var notifications by remember { mutableStateOf(viewModel.settingsManager.notificationsEnabled) }
     var threshold by remember { mutableFloatStateOf(viewModel.settingsManager.defaultThreshold) }
     var reminderDelay by remember { mutableIntStateOf(viewModel.settingsManager.reminderDelayMinutes) }
+    var medicalCountsAsAttended by remember { mutableStateOf(viewModel.settingsManager.medicalCountsAsAttended) }
     var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         notifications = granted
-        viewModel.settingsManager.notificationsEnabled = granted
+        viewModel.setNotificationsEnabled(granted)
         if (!granted) Toast.makeText(context, "Notification permission was not granted", Toast.LENGTH_SHORT).show()
     }
 
     fun setNotifications(enabled: Boolean) {
         if (!enabled) {
             notifications = false
-            viewModel.settingsManager.notificationsEnabled = false
+            viewModel.setNotificationsEnabled(false)
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -51,7 +56,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenSemesterHistory: () -> Unit) 
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
             notifications = true
-            viewModel.settingsManager.notificationsEnabled = true
+            viewModel.setNotificationsEnabled(true)
         }
     }
 
@@ -61,9 +66,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenSemesterHistory: () -> Unit) 
             Toast.makeText(context, if (ok) "Backup created" else "Backup failed", Toast.LENGTH_SHORT).show()
         }
     }
-    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        pendingRestoreUri = uri
-    }
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> pendingRestoreUri = uri }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text(stringResource(R.string.settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -84,7 +87,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenSemesterHistory: () -> Unit) 
                         selected = reminderDelay == minutes,
                         onClick = {
                             reminderDelay = minutes
-                            viewModel.settingsManager.reminderDelayMinutes = minutes
+                            viewModel.setReminderDelay(minutes)
                         },
                         label = { Text("${minutes}m") }
                     )
@@ -101,6 +104,26 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenSemesterHistory: () -> Unit) 
                 valueRange = 50f..100f,
                 steps = 49
             )
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.medical_policy), fontWeight = FontWeight.Medium)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(
+                    selected = medicalCountsAsAttended,
+                    onClick = {
+                        medicalCountsAsAttended = true
+                        viewModel.setMedicalCountsAsAttended(true)
+                    },
+                    label = { Text(stringResource(R.string.medical_counts_attended)) }
+                )
+                FilterChip(
+                    selected = !medicalCountsAsAttended,
+                    onClick = {
+                        medicalCountsAsAttended = false
+                        viewModel.setMedicalCountsAsAttended(false)
+                    },
+                    label = { Text(stringResource(R.string.medical_excluded)) }
+                )
+            }
         }
 
         Spacer(Modifier.height(12.dp))
@@ -116,6 +139,10 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenSemesterHistory: () -> Unit) 
         }
 
         Spacer(Modifier.height(12.dp))
+        OutlinedButton(onClick = onOpenAttendanceHistory, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.FactCheck, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.attendance_history))
+        }
+        Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = onOpenSemesterHistory, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.History, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.semester_management))
         }
