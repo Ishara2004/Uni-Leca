@@ -21,6 +21,7 @@ import com.example.UniLecaApplication
 import com.example.data.model.AttendanceStatus
 import com.example.data.model.HeldStatus
 import com.example.data.model.TimetableSlotWithModule
+import com.ishara.unileca.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -49,10 +50,10 @@ class AttendanceWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetContent(session: TimetableSlotWithModule?, isLoading: Boolean) {
-        val primary = ColorProvider(android.graphics.Color.parseColor("#0288D1"))
-        val background = ColorProvider(android.graphics.Color.WHITE)
-        val text = ColorProvider(android.graphics.Color.parseColor("#334155"))
-        val white = ColorProvider(android.graphics.Color.WHITE)
+        val primary = ColorProvider(R.color.widget_primary)
+        val background = ColorProvider(R.color.white)
+        val text = ColorProvider(R.color.widget_text)
+        val white = ColorProvider(R.color.white)
 
         Column(
             modifier = GlanceModifier.fillMaxSize().background(background).padding(8.dp)
