@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.*
 import com.example.ui.components.SessionDialog
 import com.example.ui.viewmodel.MainViewModel
@@ -28,11 +29,11 @@ import java.time.format.FormatStyle
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodayScreen(viewModel: MainViewModel) {
-    val semester by viewModel.selectedSemester.collectAsStateWithLifecycleCompat()
-    val dateText by viewModel.selectedDate.collectAsStateWithLifecycleCompat()
-    val sessions by viewModel.sessionsForSelectedDate.collectAsStateWithLifecycleCompat()
-    val entries by viewModel.attendanceForSelectedDate.collectAsStateWithLifecycleCompat()
-    val modules by viewModel.modules.collectAsStateWithLifecycleCompat()
+    val semester by viewModel.selectedSemester.collectAsStateWithLifecycle()
+    val dateText by viewModel.selectedDate.collectAsStateWithLifecycle()
+    val sessions by viewModel.sessionsForSelectedDate.collectAsStateWithLifecycle()
+    val entries by viewModel.attendanceForSelectedDate.collectAsStateWithLifecycle()
+    val modules by viewModel.modules.collectAsStateWithLifecycle()
 
     val selectedDate = remember(dateText) { LocalDate.parse(dateText) }
     var showCalendar by remember { mutableStateOf(false) }
@@ -167,9 +168,7 @@ private fun SessionCard(
             if (entry != null) {
                 val label = if (entry.heldStatus == HeldStatus.NOT_HELD.dbValue) stringResource(R.string.no_class) else entry.attendanceStatus
                 Text(label, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                if (editable) {
-                    TextButton(onClick = onClear) { Text(stringResource(R.string.clear_mark)) }
-                }
+                if (editable) TextButton(onClick = onClear) { Text(stringResource(R.string.clear_mark)) }
             }
 
             if (canMark) {
@@ -207,7 +206,3 @@ private fun isDateInsideSemester(semester: Semester, date: LocalDate): Boolean {
     val end = semester.endedDate?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
     return !date.isBefore(start) && (end == null || !date.isAfter(end))
 }
-
-@Composable
-private fun <T> StateFlow<T>.collectAsStateWithLifecycleCompat(): State<T> =
-    androidx.lifecycle.compose.collectAsStateWithLifecycle()
