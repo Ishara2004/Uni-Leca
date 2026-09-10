@@ -1,5 +1,6 @@
 package com.example.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -66,7 +67,7 @@ data class TimetableSlot(
     val startTime: String,
     val endTime: String,
     val sessionType: String,
-    val isRecurring: Boolean = true,
+    @ColumnInfo(defaultValue = "1") val isRecurring: Boolean = true,
     val specificDate: String? = null,
     val archivedAt: Long? = null
 ) {
