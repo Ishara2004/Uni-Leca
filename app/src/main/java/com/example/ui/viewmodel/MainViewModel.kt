@@ -23,6 +23,9 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     private val _selectedDate = MutableStateFlow(LocalDate.now().toString())
     val selectedDate: StateFlow<String> = _selectedDate.asStateFlow()
 
+    private val _medicalCountsAsAttended = MutableStateFlow(settingsManager.medicalCountsAsAttended)
+    val medicalCountsAsAttended: StateFlow<Boolean> = _medicalCountsAsAttended.asStateFlow()
+
     val activeSemester: StateFlow<Semester?> = repository.activeSemester
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -44,31 +47,27 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repository.getSlotsWithModuleForSemester(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val sessionsForSelectedDate: StateFlow<List<TimetableSlotWithModule>> = combine(
-        _selectedSemesterId,
-        _selectedDate
-    ) { semesterId, date -> semesterId to date }
-        .flatMapLatest { (semesterId, date) ->
-            if (semesterId == null) flowOf(emptyList()) else repository.getSessionsForDate(semesterId, date)
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val sessionsForSelectedDate: StateFlow<List<TimetableSlotWithModule>> = combine(_selectedSemesterId, _selectedDate) { semesterId, date ->
+        semesterId to date
+    }.flatMapLatest { (semesterId, date) ->
+        if (semesterId == null) flowOf(emptyList()) else repository.getSessionsForDate(semesterId, date)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val moduleStats: StateFlow<List<ModuleAttendanceStats>> = _selectedSemesterId
-        .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repository.getModuleAttendanceStats(id) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val moduleStats: StateFlow<List<ModuleAttendanceStats>> = combine(_selectedSemesterId, _medicalCountsAsAttended) { id, medicalPolicy ->
+        id to medicalPolicy
+    }.flatMapLatest { (id, medicalPolicy) ->
+        if (id == null) flowOf(emptyList()) else repository.getModuleAttendanceStats(id, medicalPolicy)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val attendanceDetails: StateFlow<List<AttendanceDetail>> = _selectedSemesterId
         .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repository.getAttendanceDetailsForSemester(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val attendanceForSelectedDate: StateFlow<List<AttendanceDetail>> = combine(
-        _selectedSemesterId,
-        _selectedDate
-    ) { semesterId, date -> semesterId to date }
-        .flatMapLatest { (semesterId, date) ->
-            if (semesterId == null) flowOf(emptyList()) else repository.getAttendanceDetailsForDate(semesterId, date)
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val attendanceForSelectedDate: StateFlow<List<AttendanceDetail>> = combine(_selectedSemesterId, _selectedDate) { semesterId, date ->
+        semesterId to date
+    }.flatMapLatest { (semesterId, date) ->
+        if (semesterId == null) flowOf(emptyList()) else repository.getAttendanceDetailsForDate(semesterId, date)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _navigation = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val navigation: SharedFlow<String> = _navigation.asSharedFlow()
@@ -78,40 +77,47 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
 
     init {
         viewModelScope.launch {
-            combine(activeSemester, allSemesters, selectedSemesterId) { active, semesters, selected ->
-                Triple(active, semesters, selected)
-            }.collect { (active, semesters, selected) ->
-                if (selected == null || semesters.none { it.id == selected }) {
-                    _selectedSemesterId.value = active?.id ?: semesters.firstOrNull()?.id
+            combine(activeSemester, allSemesters, selectedSemesterId) { active, semesters, selected -> Triple(active, semesters, selected) }
+                .collect { (active, semesters, selected) ->
+                    if (selected == null || semesters.none { it.id == selected }) {
+                        _selectedSemesterId.value = active?.id ?: semesters.firstOrNull()?.id
+                    }
                 }
-            }
         }
 
-        // Alarm scheduling follows the active semester, not whichever historical semester the user is viewing.
         viewModelScope.launch {
             activeSemester.flatMapLatest { active ->
                 if (active == null) flowOf(emptyList()) else repository.getSlotsWithModuleForSemester(active.id)
-            }.collect { activeSlots ->
-                container.alarmScheduler.scheduleAlarmsForSlots(activeSlots)
-            }
+            }.collect { activeSlots -> container.alarmScheduler.scheduleAlarmsForSlots(activeSlots) }
         }
     }
 
-    fun selectSemester(id: Int) {
-        _selectedSemesterId.value = id
-    }
+    fun selectSemester(id: Int) { _selectedSemesterId.value = id }
 
     fun changeSelectedDate(date: String) {
         if (runCatching { LocalDate.parse(date) }.isSuccess) _selectedDate.value = date
     }
 
-    fun jumpToToday() {
-        _selectedDate.value = LocalDate.now().toString()
-    }
+    fun jumpToToday() { _selectedDate.value = LocalDate.now().toString() }
 
     fun openDateFromNotification(date: String) {
         changeSelectedDate(date)
         _navigation.tryEmit("today")
+    }
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        settingsManager.notificationsEnabled = enabled
+        viewModelScope.launch { rescheduleActiveReminders() }
+    }
+
+    fun setReminderDelay(minutes: Int) {
+        settingsManager.reminderDelayMinutes = minutes
+        viewModelScope.launch { rescheduleActiveReminders() }
+    }
+
+    fun setMedicalCountsAsAttended(value: Boolean) {
+        settingsManager.medicalCountsAsAttended = value
+        _medicalCountsAsAttended.value = value
     }
 
     fun createSemester(name: String, duplicateFromId: Int? = null) = launchOperation("Semester created") {
@@ -163,20 +169,18 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         repository.deleteModule(module)
     }
 
-    fun addTimetableSlot(moduleId: Int, dayOfWeek: Int, start: String, end: String, type: String) =
-        launchOperation("Timetable slot added") {
-            requireSelectedEditableSemester()
-            validateNoOverlap(moduleId, dayOfWeek, null, start, end, recurring = true)
-            repository.insertRecurringSlot(moduleId, dayOfWeek, start, end, type)
-        }
+    fun addTimetableSlot(moduleId: Int, dayOfWeek: Int, start: String, end: String, type: String) = launchOperation("Timetable slot added") {
+        requireSelectedEditableSemester()
+        validateNoOverlap(moduleId, dayOfWeek, null, start, end, recurring = true)
+        repository.insertRecurringSlot(moduleId, dayOfWeek, start, end, type)
+    }
 
-    fun addExtraSession(moduleId: Int, date: String, start: String, end: String, type: String) =
-        launchOperation("Extra session added") {
-            requireSelectedEditableSemester()
-            val localDate = LocalDate.parse(date)
-            validateNoOverlap(moduleId, localDate.dayOfWeek.value, date, start, end, recurring = false)
-            repository.insertExtraSession(moduleId, date, start, end, type)
-        }
+    fun addExtraSession(moduleId: Int, date: String, start: String, end: String, type: String) = launchOperation("Extra session added") {
+        requireSelectedEditableSemester()
+        val localDate = LocalDate.parse(date)
+        validateNoOverlap(moduleId, localDate.dayOfWeek.value, date, start, end, recurring = false)
+        repository.insertExtraSession(moduleId, date, start, end, type)
+    }
 
     fun updateTimetableSlot(slot: TimetableSlot) = launchOperation("Session updated") {
         requireSelectedEditableSemester()
@@ -192,34 +196,44 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     fun markAttendance(slotId: Int, date: String, heldStatus: String, attendanceStatus: String) {
         viewModelScope.launch {
             runCatching {
-                val selected = selectedSemester.value ?: error("No semester selected")
-                require(selected.status == SemesterStatus.ACTIVE.dbValue || LocalDate.parse(date) <= endDate(selected)) {
-                    "This date is outside the semester"
-                }
-                require(LocalDate.parse(date) <= LocalDate.now()) { "Future attendance cannot be recorded" }
+                requireSelectedEditableSemester()
+                val parsedDate = LocalDate.parse(date)
+                require(parsedDate <= LocalDate.now()) { "Future attendance cannot be recorded" }
                 repository.markAttendance(slotId, date, heldStatus, attendanceStatus)
             }.onFailure { _messages.emit(it.message ?: "Could not save attendance") }
         }
     }
 
     fun clearAttendance(slotId: Int, date: String) = launchOperation("Attendance mark cleared") {
+        requireSelectedEditableSemester()
         repository.clearAttendance(slotId, date)
     }
 
-    fun riskFor(stat: ModuleAttendanceStats): AttendanceRisk = repository.calculateRisk(stat)
+    fun riskFor(stat: ModuleAttendanceStats): AttendanceRisk =
+        repository.calculateRisk(stat, _medicalCountsAsAttended.value)
 
     suspend fun exportCSV(outputStream: OutputStream) {
-        val semName = selectedSemester.value?.name ?: "Semester"
-        withContext(Dispatchers.IO) {
-            ExportHelper.exportToCSV(semName, attendanceDetails.value, moduleStats.value, outputStream)
-        }
+        val id = selectedSemesterId.value ?: return
+        exportCSVForSemester(id, outputStream)
     }
 
     suspend fun exportPDF(outputStream: OutputStream) {
-        val semName = selectedSemester.value?.name ?: "Semester"
-        withContext(Dispatchers.IO) {
-            ExportHelper.exportToPDF(semName, attendanceDetails.value, moduleStats.value, outputStream)
-        }
+        val id = selectedSemesterId.value ?: return
+        exportPDFForSemester(id, outputStream)
+    }
+
+    suspend fun exportCSVForSemester(semesterId: Int, outputStream: OutputStream) {
+        val semName = repository.getSemesterById(semesterId)?.name ?: "Semester"
+        val details = repository.getAttendanceDetailsForSemester(semesterId).first()
+        val stats = repository.getModuleAttendanceStats(semesterId, _medicalCountsAsAttended.value).first()
+        withContext(Dispatchers.IO) { ExportHelper.exportToCSV(semName, details, stats, outputStream) }
+    }
+
+    suspend fun exportPDFForSemester(semesterId: Int, outputStream: OutputStream) {
+        val semName = repository.getSemesterById(semesterId)?.name ?: "Semester"
+        val details = repository.getAttendanceDetailsForSemester(semesterId).first()
+        val stats = repository.getModuleAttendanceStats(semesterId, _medicalCountsAsAttended.value).first()
+        withContext(Dispatchers.IO) { ExportHelper.exportToPDF(semName, details, stats, outputStream) }
     }
 
     suspend fun exportBackup(outputStream: OutputStream): Boolean =
@@ -230,8 +244,19 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         if (success) {
             _selectedSemesterId.value = repository.getActiveSemesterSync()?.id
             container.alarmScheduler.cancelAllKnownAlarms()
+            rescheduleActiveReminders()
         }
         return success
+    }
+
+    private suspend fun rescheduleActiveReminders() {
+        val active = repository.getActiveSemesterSync()
+        if (active == null || !settingsManager.notificationsEnabled) {
+            container.alarmScheduler.cancelAllKnownAlarms()
+            return
+        }
+        val activeSlots = repository.getSlotsWithModuleForSemester(active.id).first()
+        container.alarmScheduler.scheduleAlarmsForSlots(activeSlots)
     }
 
     private fun launchOperation(successMessage: String, block: suspend () -> Unit) {
@@ -248,37 +273,21 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         return sem.id
     }
 
-    private fun endDate(semester: Semester): LocalDate =
-        semester.endedDate?.let {
-            java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-        } ?: LocalDate.now()
-
-    private fun validateNoOverlap(
-        moduleId: Int,
-        dayOfWeek: Int,
-        specificDate: String?,
-        start: String,
-        end: String,
-        recurring: Boolean
-    ) {
-        val startTime = java.time.LocalTime.parse(normalizeTime(start))
-        val endTime = java.time.LocalTime.parse(normalizeTime(end))
+    private fun validateNoOverlap(moduleId: Int, dayOfWeek: Int, specificDate: String?, start: String, end: String, recurring: Boolean) {
+        val normalizedStart = normalizeTime(start)
+        val normalizedEnd = normalizeTime(end)
+        val startTime = java.time.LocalTime.parse(normalizedStart)
+        val endTime = java.time.LocalTime.parse(normalizedEnd)
         require(endTime.isAfter(startTime)) { "End time must be after start time" }
 
         val conflict = slots.value.any { item ->
             val s = item.slot
-            if (s.moduleId == moduleId && s.startTime == normalizeTime(start) && s.endTime == normalizeTime(end) &&
-                s.isRecurring == recurring && (recurring && s.dayOfWeek == dayOfWeek || !recurring && s.specificDate == specificDate)) {
-                true
-            } else {
-                val sameDay = if (recurring) s.isRecurring && s.dayOfWeek == dayOfWeek
-                else !s.isRecurring && s.specificDate == specificDate
-                if (!sameDay) false
-                else {
-                    val existingStart = java.time.LocalTime.parse(s.startTime)
-                    val existingEnd = java.time.LocalTime.parse(s.endTime)
-                    startTime < existingEnd && endTime > existingStart
-                }
+            val sameDay = if (recurring) s.isRecurring && s.dayOfWeek == dayOfWeek else !s.isRecurring && s.specificDate == specificDate
+            if (!sameDay) false
+            else {
+                val existingStart = java.time.LocalTime.parse(s.startTime)
+                val existingEnd = java.time.LocalTime.parse(s.endTime)
+                startTime < existingEnd && endTime > existingStart
             }
         }
         require(!conflict) { "This session overlaps an existing slot" }
