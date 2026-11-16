@@ -99,13 +99,12 @@ fun TodayScreen(viewModel: MainViewModel) {
 
         if (selectedDate != LocalDate.now()) {
             item {
-                TextButton(
-                    onClick = viewModel::jumpToToday,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                ) {
-                    Icon(Icons.Default.Today, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.jump_today))
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    TextButton(onClick = viewModel::jumpToToday) {
+                        Icon(Icons.Default.Today, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.jump_today))
+                    }
                 }
             }
         }
