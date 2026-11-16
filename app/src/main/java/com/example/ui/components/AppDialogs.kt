@@ -1,6 +1,9 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -232,6 +235,13 @@ fun ConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = if (destructive) Icons.Default.WarningAmber else Icons.Default.Info,
+                contentDescription = null,
+                tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            )
+        },
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
