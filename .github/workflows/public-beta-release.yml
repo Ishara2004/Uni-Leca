@@ -1,0 +1,154 @@
+name: Public Beta Release
+
+run-name: Publish ${{ inputs.release_tag || 'v2.0.0-beta.1' }} preview
+
+on:
+  push:
+    branches:
+      - production-v2
+    paths:
+      - ".github/BETA_RELEASE_TRIGGER"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Beta tag to publish (for example v2.0.0-beta.2)"
+        required: true
+        default: "v2.0.0-beta.1"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  public-beta:
+    name: Verify and publish Android beta
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag || 'v2.0.0-beta.1' }}
+
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v5
+
+      - name: Validate release target and tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_NAME" != "production-v2" ]]; then
+            echo "Public beta releases must be built from production-v2."
+            exit 1
+          fi
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]]; then
+            echo "Invalid beta tag: $RELEASE_TAG"
+            echo "Expected format: vX.Y.Z-beta.N"
+            exit 1
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Unit tests
+        run: gradle testDebugUnitTest --stacktrace
+
+      - name: Android lint
+        run: gradle lintDebug --stacktrace
+
+      - name: Build preview APK
+        run: gradle assembleDebug --stacktrace
+
+      - name: Verify and package preview APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK_PATH"
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "$SDK_ROOT" ]]; then
+            echo "Android SDK path was not configured by the runner."
+            exit 1
+          fi
+
+          AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
+
+          BADGING="$("$AAPT" dump badging "$APK_PATH")"
+          echo "$BADGING" | grep -F "name='com.ishara.unileca.uipreview'"
+          VERSION="${RELEASE_TAG#v}"
+          echo "$BADGING" | grep -F "versionName='${VERSION}-ui-preview'"
+
+          "$APKSIGNER" verify --verbose --print-certs "$APK_PATH"
+
+          mkdir -p dist
+          APK_NAME="Uni-Leca-${VERSION}.apk"
+          cp "$APK_PATH" "dist/$APK_NAME"
+          (
+            cd dist
+            sha256sum "$APK_NAME" > "$APK_NAME.sha256"
+            sha256sum --check "$APK_NAME.sha256"
+          )
+
+          ls -lh dist/
+
+      - name: Publish GitHub pre-release
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Uni Leca ${{ env.RELEASE_TAG }} — Public Beta
+          prerelease: true
+          make_latest: "false"
+          fail_on_unmatched_files: true
+          body: |
+            ## Uni Leca ${{ env.RELEASE_TAG }} — Public Beta
+
+            A free public preview of the refreshed Uni Leca Android experience.
+
+            ### What's included
+            - Refreshed light-blue and white interface with Light, Dark and System modes
+            - Updated Today, Timetable, Analytics, Reports and Settings screens
+            - Filled Material icons and clearer screen layouts
+            - Colour-coded Present, Absent, Medical and No Class states
+            - Custom UL adaptive launcher icon
+            - Full-page Timetable scrolling
+            - Existing semester, attendance, backup and reporting features
+
+            ### APK details
+            - **Download:** \`Uni-Leca-${{ env.RELEASE_TAG }}.apk\`
+            - **Application ID:** \`com.ishara.unileca.uipreview\`
+            - **Minimum Android:** Android 8.0 / API 26
+            - **Build type:** Debug-signed preview APK
+            - **Channel:** Public Beta — not a production / Play Store release
+
+            This preview uses a separate application ID from the production package \`com.ishara.unileca\`, so both apps can be installed side by side.
+
+            The GitHub Actions debug signing certificate is not the production signing key and may change between preview builds. If Android refuses to update a previously installed preview, export a JSON backup, uninstall only the preview app, install the new APK and restore the backup.
+
+            ### Installation
+            1. Download the APK asset below.
+            2. Open it on your Android device.
+            3. Allow your browser or file manager to install apps from this source when Android asks.
+            4. Complete installation and open Uni Leca.
+
+            Android 8.0 and later manage this permission per installation source under **Install unknown apps**. You can turn the permission off again after installation.
+
+            ### Checksum
+            Download the \`.sha256\` file alongside the APK to verify the APK's SHA-256 hash.
+
+            ### Feedback
+            Please report issues at https://github.com/Ishara2004/Uni-Leca/issues. Include your device model, Android version and reproduction steps. Keep a current JSON backup while testing.
+          files: |
+            dist/*.apk
+            dist/*.sha256

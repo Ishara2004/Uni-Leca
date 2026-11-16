@@ -99,7 +99,7 @@
     <string name="about">About</string>
     <string name="privacy_policy">Privacy policy</string>
     <string name="privacy_summary">Attendance data is stored locally on your device. Uni Leca does not require an account and this build does not include analytics, advertising or cloud sync SDKs.</string>
-    <string name="app_version">Version 2.0</string>
+    <string name="app_version">Version 2.0.0 Beta 1</string>
     <string name="restore_warning">Restoring a backup replaces the current local database. Continue only with a trusted Uni Leca backup.</string>
     <string name="confirm_restore">Restore backup?</string>
     <string name="restore">Restore</string>
