@@ -1,6 +1,0 @@
-{
-  "name": "Uni Leca",
-  "description": "A fully offline university attendance tracker for students to monitor modules, timetables, and meeting requirements.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

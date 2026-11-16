@@ -4,66 +4,55 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.example.data.model.TimetableSlotWithModule
-import java.util.Calendar
+import com.example.ui.settings.SettingsManager
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
 
 class AlarmScheduler(private val context: Context) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    private val prefs = context.getSharedPreferences("uni_leca_alarms", Context.MODE_PRIVATE)
+    private val settings = SettingsManager(context)
 
     fun scheduleAlarmsForSlots(slots: List<TimetableSlotWithModule>) {
-        cancelAllAlarms(slots)
-        for (slotWithModule in slots) {
-            scheduleAlarmForSlot(slotWithModule)
+        val desiredIds = slots.map { it.slot.id }.toSet()
+        val previouslyScheduled = prefs.getStringSet(KEY_SCHEDULED_IDS, emptySet())
+            .orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
+
+        (previouslyScheduled - desiredIds).forEach(::cancelAlarm)
+
+        if (!settings.notificationsEnabled) {
+            desiredIds.forEach(::cancelAlarm)
+            saveScheduledIds(emptySet())
+            return
         }
+
+        val successfullyScheduled = mutableSetOf<Int>()
+        slots.forEach { item ->
+            if (scheduleAlarmForSlot(item)) successfullyScheduled += item.slot.id
+        }
+        saveScheduledIds(successfullyScheduled)
     }
 
-    fun scheduleAlarmForSlot(slotWithModule: TimetableSlotWithModule) {
-        val slot = slotWithModule.slot
-        val parts = slot.endTime.split(":")
-        if (parts.size < 2) return
-        val hour = parts[0].toIntOrNull() ?: return
-        val minute = parts[1].toIntOrNull() ?: return
-
-        val calendar = Calendar.getInstance()
-        val now = Calendar.getInstance()
-
-        val calendarDayMap = mapOf(
-            1 to Calendar.MONDAY,
-            2 to Calendar.TUESDAY,
-            3 to Calendar.WEDNESDAY,
-            4 to Calendar.THURSDAY,
-            5 to Calendar.FRIDAY,
-            6 to Calendar.SATURDAY,
-            7 to Calendar.SUNDAY
-        )
-        val targetDay = calendarDayMap[slot.dayOfWeek] ?: Calendar.MONDAY
-
-        calendar.set(Calendar.HOUR_OF_DAY, hour)
-        calendar.set(Calendar.MINUTE, minute)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        calendar.set(Calendar.DAY_OF_WEEK, targetDay)
-
-        if (calendar.before(now)) {
-            calendar.add(Calendar.WEEK_OF_YEAR, 1)
+    fun scheduleAlarmForSlot(item: TimetableSlotWithModule): Boolean {
+        val slot = item.slot
+        if (slot.archivedAt != null || !settings.notificationsEnabled) {
+            cancelAlarm(slot.id)
+            return false
         }
 
-        // Capture session date before adding 30 mins
-        val year = calendar.get(Calendar.YEAR)
-        val month = calendar.get(Calendar.MONTH) + 1
-        val day = calendar.get(Calendar.DAY_OF_MONTH)
-        val sessionDate = String.format("%04d-%02d-%02d", year, month, day)
-
-        // Schedule alarm 30 minutes after end time
-        calendar.add(Calendar.MINUTE, 30)
-        val triggerTime = calendar.timeInMillis
+        val triggerAt = calculateNextTrigger(item) ?: run {
+            cancelAlarm(slot.id)
+            return false
+        }
 
         val intent = Intent(context, NotificationReceiver::class.java).apply {
-            putExtra("slotId", slot.id)
-            putExtra("moduleName", slotWithModule.moduleName)
-            putExtra("sessionType", slot.sessionType)
-            putExtra("date", sessionDate)
+            putExtra(EXTRA_SLOT_ID, slot.id)
+            putExtra(EXTRA_MODULE_NAME, item.moduleName)
+            putExtra(EXTRA_SESSION_TYPE, slot.sessionType)
+            putExtra(EXTRA_DATE, sessionDateForTrigger(item, triggerAt))
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -73,30 +62,93 @@ class AlarmScheduler(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-            } else {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-            }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-        }
+        // Attendance reminders do not require exact-to-the-minute delivery. Using an
+        // inexact idle-safe alarm avoids special exact-alarm access and Play policy friction.
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        rememberScheduled(slot.id)
+        return true
     }
 
-    fun cancelAllAlarms(slots: List<TimetableSlotWithModule>) {
-        for (slotWithModule in slots) {
-            val intent = Intent(context, NotificationReceiver::class.java)
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                slotWithModule.slot.id,
-                intent,
-                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-            )
-            if (pendingIntent != null) {
-                alarmManager.cancel(pendingIntent)
-                pendingIntent.cancel()
-            }
+    fun cancelAlarm(slotId: Int) {
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            slotId,
+            Intent(context, NotificationReceiver::class.java),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        )
+        pendingIntent?.let {
+            alarmManager.cancel(it)
+            it.cancel()
         }
+        forgetScheduled(slotId)
+    }
+
+    fun cancelAllKnownAlarms() {
+        prefs.getStringSet(KEY_SCHEDULED_IDS, emptySet()).orEmpty()
+            .mapNotNull { it.toIntOrNull() }
+            .forEach(::cancelAlarm)
+        saveScheduledIds(emptySet())
+    }
+
+    private fun calculateNextTrigger(item: TimetableSlotWithModule): Long? {
+        val slot = item.slot
+        val zone = ZoneId.systemDefault()
+        val now = ZonedDateTime.now(zone)
+        val endTime = runCatching { LocalTime.parse(slot.endTime) }.getOrNull() ?: return null
+        val delay = settings.reminderDelayMinutes.toLong()
+
+        val scheduledDate = if (slot.isRecurring) {
+            val today = LocalDate.now(zone)
+            val currentDay = today.dayOfWeek.value
+            var daysAhead = (slot.dayOfWeek - currentDay + 7) % 7
+            var candidate = ZonedDateTime.of(today.plusDays(daysAhead.toLong()), endTime, zone)
+                .plusMinutes(delay)
+            if (!candidate.isAfter(now)) {
+                daysAhead += 7
+                candidate = ZonedDateTime.of(today.plusDays(daysAhead.toLong()), endTime, zone)
+                    .plusMinutes(delay)
+            }
+            candidate
+        } else {
+            val date = slot.specificDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                ?: return null
+            val candidate = ZonedDateTime.of(date, endTime, zone).plusMinutes(delay)
+            if (!candidate.isAfter(now)) return null
+            candidate
+        }
+
+        return scheduledDate.toInstant().toEpochMilli()
+    }
+
+    private fun sessionDateForTrigger(item: TimetableSlotWithModule, triggerAt: Long): String {
+        item.slot.specificDate?.let { return it }
+        val zone = ZoneId.systemDefault()
+        val triggerDateTime = ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(triggerAt), zone)
+        val sessionInstant = triggerDateTime.minusMinutes(settings.reminderDelayMinutes.toLong())
+        return sessionInstant.toLocalDate().toString()
+    }
+
+    private fun rememberScheduled(slotId: Int) {
+        val set = prefs.getStringSet(KEY_SCHEDULED_IDS, emptySet()).orEmpty().toMutableSet()
+        set += slotId.toString()
+        saveScheduledIds(set.mapNotNull { it.toIntOrNull() }.toSet())
+    }
+
+    private fun forgetScheduled(slotId: Int) {
+        val set = prefs.getStringSet(KEY_SCHEDULED_IDS, emptySet()).orEmpty().toMutableSet()
+        set -= slotId.toString()
+        prefs.edit().putStringSet(KEY_SCHEDULED_IDS, set).apply()
+    }
+
+    private fun saveScheduledIds(ids: Set<Int>) {
+        prefs.edit().putStringSet(KEY_SCHEDULED_IDS, ids.map { it.toString() }.toSet()).apply()
+    }
+
+    companion object {
+        private const val KEY_SCHEDULED_IDS = "scheduled_alarm_ids"
+        const val EXTRA_SLOT_ID = "slotId"
+        const val EXTRA_MODULE_NAME = "moduleName"
+        const val EXTRA_SESSION_TYPE = "sessionType"
+        const val EXTRA_DATE = "date"
     }
 }

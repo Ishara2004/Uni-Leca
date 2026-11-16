@@ -1,106 +1,141 @@
-# 🎓 Uni Leca - Ultimate University Attendance & Timetable Companion
+# 🎓 Uni Leca
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org/)
-[![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-blue.svg?style=flat&logo=android)](https://developer.android.com/jetpack/compose)
-[![Architecture](https://img.shields.io/badge/Architecture-MVVM%20%2B%20Clean-green.svg?style=flat)]()
-[![Database](https://img.shields.io/badge/Database-Room%20%2F%20SQLite-orange.svg?style=flat)]()
+**Offline university attendance, timetable and attendance-risk companion for Android.**
 
-**Uni Leca** is a feature-rich, standalone Android application meticulously designed for university undergraduates to painlessly track academic schedules, manage custom module requirements, and maintain crucial attendance thresholds. Built with cutting-edge Android development practices, it features an intuitive dark-themed user interface, robust offline storage, automated alerts, and professional analytical reporting systems.
+Uni Leca helps students maintain a weekly timetable, record class attendance, monitor module thresholds and understand attendance risk without creating an account or sending academic tracking data to a server.
 
----
+> `production-v2` is the release-hardening branch. It includes a data-preserving migration from the original v1 database. Do not merge it to `main` until the migration has been installed over a copy of real v1 user data and the release checklist has passed.
 
-## 🚀 Key Features
+## Features
 
-### 📅 Smart Timetable & Semester Lifecycle Management
-* **Seamless Semester Rollovers:** Create distinct semesters with the unique ability to duplicate existing modules and schedules to avoid repetitive setups.
-* **Flexible Slot Configurations:** Customize lecture types (Lecture, Tutorial, Lab) with precise multi-hour window allocations down to the minute.
-* **Dynamic Module Thresholds:** Independently configure unique eligibility requirements per module (e.g., 80% mandatory attendance) using custom interactive sliders.
+### Attendance tracking
 
-### ⏱️ One-Tap Attendance Logging (Today View)
-* **Status Varieties:** Log attendance variables perfectly suited for academia: `Present`, `Absent`, `Medical Leave`, or `No Class`.
-* **Chronological Daily Dashboard:** Automatically structures the current day's sessions in a clean visual queue showing exact times and direct interactive state switchers.
+- Present, Absent, Medical and No Class states
+- One attendance record per session/date enforced by Room
+- Past attendance can be corrected or cleared
+- Future attendance cannot be recorded before the session begins
+- Zero recorded classes display as no data instead of a misleading 100%
 
-### 📊 Deep Analytics Dashboard
-* **Visual Ratios:** Real-time generation of overall attendance performance breakups via crisp, embedded data visualization pie charts.
-* **Smart Status Tracking:** Real-time calculations categorizing module security states into automated high-visibility visual badges: `SAFE`, `WARNING`, or `BELOW THRESHOLD`.
-* **Proactive Protection:** Visually alerts users immediately when a single missed session risks dropping eligibility below the predefined barrier.
+### Lecture / LAB / Tutorial analytics
 
-### 📄 Professional Exporting & Backups
-* **Document Generation:** Native high-quality PDF summary sheets and structural CSV/Excel sheet generation for individual semesters. Includes deep log histories tracking medical validation states.
-* **Data Insurance:** Integrated local backup and structured restoration helper framework utilizing optimized data extraction rules to prevent accidental tracking loss.
+Each module has an overall attendance percentage plus independent percentages for its session types. Example:
 
-### 📱 Launcher Widget Integration
-* Powered by **Android Glance**, bringing interactive minimal dashboard controls right to the user's home screen for instantaneous checks without app launch requirements.
-
----
-
-## 🛠️ Architecture & Tech Stack
-
-Uni Leca is built with stability, testability, and clean architecture separation principles at its core:
-
-* **Language:** 100% Type-Safe [Kotlin](https://kotlinlang.org/)
-* **UI Layer:** [Jetpack Compose](https://developer.android.com/jetpack/compose) for a fully declarative, reactive UI system alongside modern Material 3 layout primitives.
-* **Architecture Pattern:** Strict **MVVM (Model-View-ViewModel)** orchestration pattern maximizing unidirectional data flows.
-* **Local Storage:** [Room Persistent Library](https://developer.android.com/training/data-storage/room) mapping structural database interactions using customized DAOs and transactional repository patterns.
-* **Asynchronous Operations:** Kotlin Coroutines and StateFlow elements handling fluid UI state updates asynchronously.
-* **Background Scheduling:** [AlarmManager](https://developer.android.com/reference/android/app/AlarmManager) paired with system BroadcastReceivers to schedule smart background status syncs and system boot survival routines.
-* **Widget Framework:** Jetpack Glance rendering custom, light-overhead app widgets mirroring Room state parameters natively.
-
----
-
-## 📂 Project Structure Walkthrough
-
-```bash
-Uni-Leca/
-├── app/
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/com/example/
-│   │   │   │   ├── data/
-│   │   │   │   │   ├── backup/       # Data encryption & Backup/Restore engines
-│   │   │   │   │   ├── db/           # Room Database configurations & Daos
-│   │   │   │   │   ├── model/        # Unified immutable domain data models
-│   │   │   │   │   └── repository/   # Single-source-of-truth abstractions
-│   │   │   │   ├── notification/     # Alarm Schedulers, Boot and Notification receivers
-│   │   │   │   ├── ui/
-│   │   │   │   │   ├── theme/        # Material 3 typographic & dark system custom palettes
-│   │   │   │   │   ├── reports/      # PDF & CSV reporting engines
-│   │   │   │   │   ├── settings/     # Global preference state controllers
-│   │   │   │   │   └── viewmodel/    # Main business logic handlers
-│   │   │   │   └── widget/           # Android Glance home screen interactive widgets
-│   │   │   └── res/                  # Visual assets, Vector layouts, and structural XML templates
-│   │   └── test/                     # UI Screenshot, Integration & Robolectric verification suites
+```text
+Operating Systems
+Overall   84.6%
+Lecture   75.0%
+LAB      100.0%
+Tutorial      —
 ```
 
----
+The analytics screen also estimates the percentage after another missed session, how many additional misses remain before falling below the threshold, or how many consecutive attendances may be needed to recover.
 
-## ⚙️ Setup & Installation
+### Timetable and extra sessions
 
-1. **Clone the repository:**
-   ```bash
-    git clone https://github.com/Ishara2004/Uni-Leca.git
-    cd Uni-Leca
-   ```
+- Recurring weekly Lecture, Tutorial and LAB slots
+- Editable module names, thresholds and timetable slots
+- One-off extra sessions attached to a specific calendar date
+- Time-range and overlap validation
+- Removing a schedule with existing attendance archives the schedule instead of deleting its historical attendance
 
-2. **Environment Configuration:**
-   * Duplicate `.env.example` to create your own configuration:
-     ```bash
-     cp .env.example .env
-     ```
+### Calendar navigation
 
-3. **Build & Run:**
-   * Open the project root inside **Android Studio (Ladybug or newer)**.
-   * Sync the Gradle configurations (`build.gradle.kts`).
-   * Connect an Android device or virtual emulator (API level 26 or above recommended) and press **Run**.
+The Today screen supports previous/next navigation, a jump-to-today action and a Material calendar picker for direct access to any date.
 
----
+### Semester lifecycle
 
-## 🧪 Testing Focus
-The codebase features a modern verification setup:
-* **Robolectric Integration:** Validating core background workflows without emulator overhead.
-* **Screenshot Verification:** Automated visual testing suites ensuring layout component structures do not warp or distort across multi-density display dimensions.
+- Create semesters
+- Duplicate modules and weekly timetable from an earlier semester
+- Only one active semester is maintained by the repository workflow
+- End semesters into read-only history
+- Review semester history
+- Permanently delete a semester with an explicit destructive confirmation
 
----
+### Reminders and widget
 
-## 📄 License
-This project is open-source and structured under the standard MIT License parameters.
+- Optional post-class reminders
+- No exact-alarm permission
+- Reminder recurrence for weekly timetable slots
+- One-shot reminders for extra sessions
+- Reboot-safe reminder restoration
+- Notification actions for Present, Absent and Medical
+- Home-screen widget that does not offer attendance actions before a session starts and no longer falls back to an already-finished morning class after the day's schedule is over
+
+### Backup and reports
+
+- PDF report
+- CSV export with safer quoting/formula handling
+- v2 JSON backup envelope with format version, timestamp and SHA-256 integrity checksum
+- Legacy v1 JSON backup import support
+- Validation before replacing the local database
+- Android automatic cloud backup disabled; exports go only to a location chosen through Android's Storage Access Framework
+
+## Architecture
+
+```text
+Compose UI screens
+      ↓
+MainViewModel
+      ↓
+AppContainer / injected dependencies
+      ↓
+AttendanceRepository
+      ↓
+Room database
+
+AlarmScheduler ↔ BroadcastReceivers
+BackupRestoreHelper ↔ versioned JSON
+ExportHelper ↔ PDF / CSV
+Glance Widget ↔ Repository
+```
+
+The UI is split into focused screens and uses Navigation Compose. Dependencies are created once in `UniLecaApplication` and supplied through `AppContainer`; the ViewModel no longer constructs its own repository/scheduler/settings dependencies.
+
+## Technology
+
+- Kotlin
+- Jetpack Compose + Material 3
+- Navigation Compose
+- Room / SQLite
+- Kotlin Coroutines + Flow
+- Android Glance
+- AlarmManager with inexact idle-safe reminders
+- Moshi
+- Robolectric / JUnit
+- R8 + resource shrinking for release builds
+
+## Android / Play configuration
+
+- `applicationId`: `com.ishara.unileca`
+- `minSdk`: 26
+- `targetSdk`: 36
+- `compileSdk`: 36
+- Version: 2.0 / versionCode 2
+
+Release signing values are read only from environment variables. Keystores and secrets are excluded from Git.
+
+## Build verification
+
+GitHub Actions runs:
+
+```text
+testDebugUnitTest
+lintDebug
+assembleDebug
+bundleRelease
+```
+
+Business tests cover independent session-type analytics, zero-data attendance behavior, one-off extra sessions and preservation of attendance history when schedule rules are removed.
+
+## Privacy
+
+The release branch does not require an account and removes the original unused Firebase/AI/network dependencies. See:
+
+- `PRIVACY_POLICY.md`
+- `DATA_SAFETY.md`
+- `PLAY_STORE_RELEASE_CHECKLIST.md`
+- `STORE_LISTING.md`
+
+## Release process
+
+Before production publishing, follow every unchecked verification step in `PLAY_STORE_RELEASE_CHECKLIST.md`, especially installing the v2 migration over a copy of the existing v1 app data before merging to `main`.

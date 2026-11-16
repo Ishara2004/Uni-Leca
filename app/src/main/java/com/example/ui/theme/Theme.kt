@@ -1,66 +1,81 @@
 package com.example.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-
-private val DarkColorScheme = darkColorScheme(
-    primary = DarkMinimalPrimary,
-    secondary = DarkMinimalSecondary,
-    tertiary = DarkMinimalTertiary,
-    background = DarkMinimalBackground,
-    surface = DarkMinimalSurface,
-    onPrimary = Color.Black,
-    onSecondary = Color.White,
-    onBackground = DarkMinimalOnSurface,
-    onSurface = DarkMinimalOnSurface,
-    onSurfaceVariant = Color(0xFF94A3B8),
-    primaryContainer = Color(0xFF00325B),
-    onPrimaryContainer = Color(0xFFD1E4FF)
-)
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 
 private val LightColorScheme = lightColorScheme(
-    primary = MinimalPrimary,
-    secondary = MinimalSecondary,
-    tertiary = MinimalTertiary,
-    background = MinimalBackground,
-    surface = MinimalSurface,
+    primary = BrandBlue,
     onPrimary = Color.White,
-    onSecondary = Color.White,
-    onBackground = MinimalTextPrimary,
-    onSurface = MinimalTextPrimary,
-    onSurfaceVariant = MinimalTextSecondary,
-    primaryContainer = MinimalTertiary,
-    onPrimaryContainer = MinimalOnPrimaryContainer,
-    surfaceVariant = Color(0xFFF1F5F9) // slate-100
+    primaryContainer = LightBlueContainer,
+    onPrimaryContainer = Color(0xFF07365E),
+    secondary = BrandCyan,
+    onSecondary = Color(0xFF003640),
+    secondaryContainer = Color(0xFFD6F7FC),
+    onSecondaryContainer = Color(0xFF063B44),
+    tertiary = BrandAmber,
+    onTertiary = Color(0xFF3F2A00),
+    background = LightBackground,
+    onBackground = LightText,
+    surface = LightSurface,
+    onSurface = LightText,
+    surfaceVariant = LightSurfaceVariant,
+    onSurfaceVariant = LightTextMuted,
+    outline = Color(0xFFC9D9E9),
+    outlineVariant = Color(0xFFDDE8F3),
+    error = Color(0xFFC83D50),
+    errorContainer = Color(0xFFFFDADB),
+    onErrorContainer = Color(0xFF680018)
+)
+
+private val DarkColorScheme = darkColorScheme(
+    primary = DarkPrimary,
+    onPrimary = Color(0xFF003353),
+    primaryContainer = Color(0xFF164C77),
+    onPrimaryContainer = Color(0xFFD7ECFF),
+    secondary = DarkSecondary,
+    onSecondary = Color(0xFF00363F),
+    secondaryContainer = Color(0xFF164B55),
+    onSecondaryContainer = Color(0xFFD0F7FC),
+    tertiary = DarkTertiary,
+    onTertiary = Color(0xFF402B00),
+    background = DarkBackground,
+    onBackground = DarkText,
+    surface = DarkSurface,
+    onSurface = DarkText,
+    surfaceVariant = DarkSurfaceVariant,
+    onSurfaceVariant = DarkTextMuted,
+    outline = Color(0xFF536B83),
+    outlineVariant = Color(0xFF344A61),
+    error = Color(0xFFFF9AA5),
+    errorContainer = Color(0xFF5C2630),
+    onErrorContainer = Color(0xFFFFDADD)
+)
+
+private val AppShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(18.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(30.dp)
 )
 
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Set dynamic color default to false to force our beautiful branding
-    dynamicColor: Boolean = false,
-    content: @Composable () -> Unit,
+    content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         typography = Typography,
+        shapes = AppShapes,
         content = content
     )
 }
