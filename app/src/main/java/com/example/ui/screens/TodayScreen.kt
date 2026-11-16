@@ -6,7 +6,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.AddAlarm
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,68 +44,104 @@ fun TodayScreen(viewModel: MainViewModel) {
     var showCalendar by remember { mutableStateOf(false) }
     var showExtra by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            IconButton(onClick = { viewModel.changeSelectedDate(selectedDate.minusDays(1).toString()) }) {
-                Icon(Icons.Default.ChevronLeft, stringResource(R.string.previous_day))
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    selectedDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(selectedDate.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
-            }
-            Row {
-                IconButton(onClick = { showCalendar = true }) {
-                    Icon(Icons.Default.CalendarMonth, stringResource(R.string.open_calendar))
-                }
-                IconButton(onClick = { viewModel.changeSelectedDate(selectedDate.plusDays(1).toString()) }) {
-                    Icon(Icons.Default.ChevronRight, stringResource(R.string.next_day))
+    val validForSemester = semester?.let { isDateInsideSemester(it, selectedDate) } == true
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            ScreenHeader(
+                title = stringResource(R.string.today),
+                subtitle = semester?.name ?: stringResource(R.string.no_semester),
+                icon = Icons.Default.Today
+            )
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    IconButton(onClick = { viewModel.changeSelectedDate(selectedDate.minusDays(1).toString()) }) {
+                        Icon(Icons.Default.ChevronLeft, stringResource(R.string.previous_day))
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            selectedDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            selectedDate.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { showCalendar = true }) {
+                            Icon(Icons.Default.CalendarMonth, stringResource(R.string.open_calendar))
+                        }
+                        IconButton(onClick = { viewModel.changeSelectedDate(selectedDate.plusDays(1).toString()) }) {
+                            Icon(Icons.Default.ChevronRight, stringResource(R.string.next_day))
+                        }
+                    }
                 }
             }
         }
 
         if (selectedDate != LocalDate.now()) {
-            TextButton(onClick = viewModel::jumpToToday, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Icon(Icons.Default.Today, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.jump_today))
+            item {
+                TextButton(
+                    onClick = viewModel::jumpToToday,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Icon(Icons.Default.Today, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.jump_today))
+                }
             }
         }
 
         if (semester?.isActive == true && modules.isNotEmpty()) {
-            OutlinedButton(onClick = { showExtra = true }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.AddAlarm, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.add_extra_session))
+            item {
+                FilledTonalButton(
+                    onClick = { showExtra = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.AddAlarm, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.add_extra_session))
+                }
             }
-            Spacer(Modifier.height(12.dp))
         }
 
-        val validForSemester = semester?.let { isDateInsideSemester(it, selectedDate) } == true
         if (!validForSemester || sessions.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.no_sessions), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            item {
+                EmptyState(
+                    title = "Nothing scheduled",
+                    message = stringResource(R.string.no_sessions),
+                    icon = Icons.Default.CalendarMonth
+                )
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(sessions, key = { it.slot.id }) { item ->
-                    val entry = entries.firstOrNull { it.slot.id == item.slot.id }?.entry
-                    SessionCard(
-                        item = item,
-                        entry = entry,
-                        selectedDate = selectedDate,
-                        editable = semester?.isActive == true,
-                        onMark = { held, status -> viewModel.markAttendance(item.slot.id, dateText, held, status) },
-                        onClear = { viewModel.clearAttendance(item.slot.id, dateText) }
-                    )
-                }
+            items(sessions, key = { "today-${it.slot.id}" }) { item ->
+                val entry = entries.firstOrNull { it.slot.id == item.slot.id }?.entry
+                SessionCard(
+                    item = item,
+                    entry = entry,
+                    selectedDate = selectedDate,
+                    editable = semester?.isActive == true,
+                    onMark = { held, status -> viewModel.markAttendance(item.slot.id, dateText, held, status) },
+                    onClear = { viewModel.clearAttendance(item.slot.id, dateText) }
+                )
             }
         }
     }
@@ -119,8 +160,12 @@ fun TodayScreen(viewModel: MainViewModel) {
                     showCalendar = false
                 }) { Text(stringResource(R.string.save)) }
             },
-            dismissButton = { TextButton(onClick = { showCalendar = false }) { Text(stringResource(R.string.cancel)) } }
-        ) { DatePicker(state = pickerState) }
+            dismissButton = {
+                TextButton(onClick = { showCalendar = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        ) {
+            DatePicker(state = pickerState)
+        }
     }
 
     if (showExtra) {
@@ -147,56 +192,97 @@ private fun SessionCard(
 ) {
     val slot = item.slot
     val started = selectedDate.isBefore(LocalDate.now()) ||
-        (selectedDate == LocalDate.now() && runCatching { !LocalTime.now().isBefore(LocalTime.parse(slot.startTime)) }.getOrDefault(false))
+        (selectedDate == LocalDate.now() && runCatching {
+            !LocalTime.now().isBefore(LocalTime.parse(slot.startTime))
+        }.getOrDefault(false))
     val canMark = editable && started && !selectedDate.isAfter(LocalDate.now())
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    modifier = Modifier.size(44.dp),
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        SessionTypeIcon(
+                            slot.sessionType,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(item.moduleName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Text("${slot.sessionType} · ${slot.startTime}–${slot.endTime}", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "${slot.sessionType}  ·  ${slot.startTime}–${slot.endTime}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                if (slot.isExtraSession) AssistChip(onClick = {}, label = { Text(stringResource(R.string.extra_badge)) })
+                if (slot.isExtraSession) {
+                    AssistChip(onClick = {}, label = { Text(stringResource(R.string.extra_badge)) })
+                }
             }
 
-            Spacer(Modifier.height(12.dp))
             if (entry != null) {
-                val label = if (entry.heldStatus == HeldStatus.NOT_HELD.dbValue) stringResource(R.string.no_class) else entry.attendanceStatus
-                Text(label, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                if (editable) TextButton(onClick = onClear) { Text(stringResource(R.string.clear_mark)) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AttendanceStatusPill(
+                        if (entry.heldStatus == HeldStatus.NOT_HELD.dbValue) {
+                            stringResource(R.string.no_class)
+                        } else {
+                            entry.attendanceStatus
+                        }
+                    )
+                    if (editable) {
+                        TextButton(onClick = onClear) {
+                            Text(stringResource(R.string.clear_mark))
+                        }
+                    }
+                }
             }
 
             if (canMark) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    AttendanceButton(stringResource(R.string.present), Modifier.weight(1f)) {
+                    AttendanceActionButton(stringResource(R.string.present), Modifier.weight(1f)) {
                         onMark(HeldStatus.HELD.dbValue, AttendanceStatus.PRESENT.dbValue)
                     }
-                    AttendanceButton(stringResource(R.string.absent), Modifier.weight(1f)) {
+                    AttendanceActionButton(stringResource(R.string.absent), Modifier.weight(1f)) {
                         onMark(HeldStatus.HELD.dbValue, AttendanceStatus.ABSENT.dbValue)
                     }
-                    AttendanceButton(stringResource(R.string.medical), Modifier.weight(1f)) {
+                    AttendanceActionButton(stringResource(R.string.medical), Modifier.weight(1f)) {
                         onMark(HeldStatus.HELD.dbValue, AttendanceStatus.MEDICAL.dbValue)
                     }
-                    AttendanceButton(stringResource(R.string.no_class), Modifier.weight(1f)) {
+                    AttendanceActionButton(stringResource(R.string.no_class), Modifier.weight(1f)) {
                         onMark(HeldStatus.NOT_HELD.dbValue, AttendanceStatus.PRESENT.dbValue)
                     }
                 }
             } else if (editable && selectedDate >= LocalDate.now()) {
-                Text(stringResource(R.string.future_marking_blocked), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        stringResource(R.string.future_marking_blocked),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
-    }
-}
-
-@Composable
-private fun AttendanceButton(text: String, modifier: Modifier, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, modifier = modifier, contentPadding = PaddingValues(horizontal = 2.dp)) {
-        Text(text, maxLines = 1, style = MaterialTheme.typography.labelSmall)
     }
 }
 
