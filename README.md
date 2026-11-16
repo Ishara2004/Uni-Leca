@@ -135,12 +135,21 @@ The UI refresh changes presentation and user preferences. It does not change the
 | Minimum SDK | 26 |
 | Target SDK | 36 |
 | Compile SDK | 36 |
-| Version | 2.0 |
+| Version | 2.0.0-beta.1 (public preview) |
 | Version code | 2 |
 
 The debug UI-preview build adds the .uipreview application ID suffix so it can be installed alongside an existing Uni Leca installation for side-by-side testing. The release application ID remains com.ishara.unileca.
 
 Release signing values are read only from environment variables. Keystores and secrets are excluded from Git.
+
+
+## Public beta download
+
+**Uni Leca 2.0.0 Beta 1** is available as a free Android preview through [GitHub Releases](https://github.com/Ishara2004/Uni-Leca/releases/tag/v2.0.0-beta.1).
+
+Download the `Uni-Leca-2.0.0-beta.1.apk` asset from the release page. This preview uses the separate application ID `com.ishara.unileca.uipreview`, allowing it to sit alongside an installation using the production application ID.
+
+This is a debug-signed public preview, not the production-signed Play Store build. A later preview may use a different debug signing certificate; export a JSON backup before replacing it. See [BETA_TESTING.md](BETA_TESTING.md) for installation, backup and upgrade instructions.
 
 ## Build and verification
 
