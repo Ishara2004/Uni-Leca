@@ -13,6 +13,7 @@ class SettingsManager(context: Context) {
         private const val KEY_REMINDER_DELAY_MINUTES = "reminder_delay_minutes"
         private const val KEY_NOTIFICATION_RATIONALE_SEEN = "notification_rationale_seen"
         private const val KEY_MEDICAL_COUNTS_AS_ATTENDED = "medical_counts_as_attended"
+        private const val KEY_THEME_MODE = "theme_mode"
     }
 
     var notificationsEnabled: Boolean
@@ -34,4 +35,11 @@ class SettingsManager(context: Context) {
     var medicalCountsAsAttended: Boolean
         get() = prefs.getBoolean(KEY_MEDICAL_COUNTS_AS_ATTENDED, true)
         set(value) = prefs.edit().putBoolean(KEY_MEDICAL_COUNTS_AS_ATTENDED, value).apply()
+
+    var themeMode: String
+        get() = prefs.getString(KEY_THEME_MODE, "system") ?: "system"
+        set(value) {
+            val normalized = value.lowercase().takeIf { it in setOf("system", "light", "dark") } ?: "system"
+            prefs.edit().putString(KEY_THEME_MODE, normalized).apply()
+        }
 }
