@@ -37,6 +37,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Keep the refresh test build side-by-side with the installed app.
+            // The production/release applicationId remains com.ishara.unileca.
+            applicationIdSuffix = ".ui-preview"
+            versionNameSuffix = "-ui-preview"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
