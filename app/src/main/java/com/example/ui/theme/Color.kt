@@ -2,25 +2,24 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Clean Minimalism Palette (Primary Design Identity)
-val MinimalPrimary = Color(0xFF0061A4)
-val MinimalSecondary = Color(0xFF004881)
-val MinimalTertiary = Color(0xFFD1E4FF)
+// Uni Leca's energetic academic identity: light blue, white and vivid cyan.
+val BrandBlue = Color(0xFF1687E8)
+val BrandBlueDeep = Color(0xFF086BC6)
+val BrandCyan = Color(0xFF12B8D6)
+val BrandAmber = Color(0xFFFFB547)
 
-val MinimalBackground = Color(0xFFF8FAFF)
-val MinimalSurface = Color(0xFFFFFFFF)
+val LightBackground = Color(0xFFF3F8FE)
+val LightSurface = Color(0xFFFFFFFF)
+val LightText = Color(0xFF152B43)
+val LightTextMuted = Color(0xFF657B92)
+val LightBlueContainer = Color(0xFFDCEEFF)
+val LightSurfaceVariant = Color(0xFFEAF2FA)
 
-// Semantic Slate colors from the Clean Minimalism design spec
-val MinimalTextPrimary = Color(0xFF0F172A)  // slate-900
-val MinimalTextSecondary = Color(0xFF64748B) // slate-500
-val MinimalOnPrimaryContainer = Color(0xFF001D36)
-
-// Dark theme support matching the Clean Minimalism vibe
-val DarkMinimalPrimary = Color(0xFF9ECAFF)
-val DarkMinimalSecondary = Color(0xFF004881)
-val DarkMinimalTertiary = Color(0xFF00325B)
-
-val DarkMinimalBackground = Color(0xFF0F1115)
-val DarkMinimalSurface = Color(0xFF1B1E24)
-val DarkMinimalOnSurface = Color(0xFFE2E8F0)
-
+val DarkPrimary = Color(0xFF83C4FF)
+val DarkSecondary = Color(0xFF65D9EB)
+val DarkTertiary = Color(0xFFFFC36D)
+val DarkBackground = Color(0xFF0C1726)
+val DarkSurface = Color(0xFF142337)
+val DarkSurfaceVariant = Color(0xFF20334A)
+val DarkText = Color(0xFFEAF4FF)
+val DarkTextMuted = Color(0xFFB1C2D4)
