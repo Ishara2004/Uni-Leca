@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
@@ -88,7 +89,7 @@ fun MainScreen(
         val bottomRoutes = listOf(
             NavItem(Routes.TODAY, R.string.today, Icons.Default.Today),
             NavItem(Routes.TIMETABLE, R.string.timetable, Icons.Default.CalendarMonth),
-            NavItem(Routes.ANALYTICS, R.string.analytics, Icons.Default.Assessment),
+            NavItem(Routes.ANALYTICS, R.string.analytics, Icons.Default.Insights),
             NavItem(Routes.REPORTS, R.string.reports, Icons.Default.Assessment),
             NavItem(Routes.SETTINGS, R.string.settings, Icons.Default.Settings)
         )
