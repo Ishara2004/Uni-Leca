@@ -40,7 +40,7 @@ android {
         debug {
             // Keep the refresh test build side-by-side with the installed app.
             // The production/release applicationId remains com.ishara.unileca.
-            applicationIdSuffix = ".ui-preview"
+            applicationIdSuffix = ".uipreview"
             versionNameSuffix = "-ui-preview"
         }
         release {
