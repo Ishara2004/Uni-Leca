@@ -8,10 +8,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -31,7 +37,11 @@ import com.ishara.unileca.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(
+    viewModel: MainViewModel,
+    themeMode: String,
+    onThemeModeChange: (String) -> Unit
+) {
     val context = LocalContext.current
     val navController = rememberNavController()
     val semesters by viewModel.allSemesters.collectAsStateWithLifecycle()
@@ -66,28 +76,44 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 
     if (semesters.isEmpty()) {
-        Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbar) },
+            containerColor = MaterialTheme.colorScheme.background
+        ) { padding ->
             WelcomeScreen(Modifier.padding(padding)) { showAddSemester = true }
         }
     } else {
         val backStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = backStackEntry?.destination?.route ?: Routes.TODAY
         val bottomRoutes = listOf(
-            NavItem(Routes.TODAY, R.string.today),
-            NavItem(Routes.TIMETABLE, R.string.timetable),
-            NavItem(Routes.ANALYTICS, R.string.analytics),
-            NavItem(Routes.REPORTS, R.string.reports),
-            NavItem(Routes.SETTINGS, R.string.settings)
+            NavItem(Routes.TODAY, R.string.today, Icons.Default.Today),
+            NavItem(Routes.TIMETABLE, R.string.timetable, Icons.Default.CalendarMonth),
+            NavItem(Routes.ANALYTICS, R.string.analytics, Icons.Default.Assessment),
+            NavItem(Routes.REPORTS, R.string.reports, Icons.Default.Assessment),
+            NavItem(Routes.SETTINGS, R.string.settings, Icons.Default.Settings)
         )
 
         Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
                 TopAppBar(
+                    navigationIcon = {
+                        Icon(
+                            imageVector = Icons.Default.School,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(start = 8.dp).size(25.dp)
+                        )
+                    },
                     title = {
                         Column {
                             Text(stringResource(R.string.app_name), fontWeight = FontWeight.Bold)
-                            Text(selectedSemester?.name ?: stringResource(R.string.no_semester), style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                selectedSemester?.name ?: stringResource(R.string.no_semester),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     },
                     actions = {
@@ -99,11 +125,18 @@ fun MainScreen(viewModel: MainViewModel) {
                                 Text(stringResource(R.string.end_semester))
                             }
                         }
-                    }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
             },
             bottomBar = {
-                NavigationBar {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 4.dp
+                ) {
                     bottomRoutes.forEach { item ->
                         NavigationBarItem(
                             selected = currentRoute == item.route,
@@ -114,8 +147,14 @@ fun MainScreen(viewModel: MainViewModel) {
                                     restoreState = true
                                 }
                             },
-                            icon = { Text(item.labelSymbol()) },
-                            label = { Text(stringResource(item.labelRes)) }
+                            icon = {
+                                Icon(
+                                    imageVector = item.icon,
+                                    contentDescription = stringResource(item.labelRes)
+                                )
+                            },
+                            label = { Text(stringResource(item.labelRes)) },
+                            alwaysShowLabel = true
                         )
                     }
                 }
@@ -133,6 +172,8 @@ fun MainScreen(viewModel: MainViewModel) {
                 composable(Routes.SETTINGS) {
                     SettingsScreen(
                         viewModel = viewModel,
+                        themeMode = themeMode,
+                        onThemeModeChange = onThemeModeChange,
                         onOpenSemesterHistory = { navController.navigate(Routes.SEMESTER_HISTORY) },
                         onOpenAttendanceHistory = { navController.navigate(Routes.ATTENDANCE_HISTORY) }
                     )
@@ -175,6 +216,7 @@ fun MainScreen(viewModel: MainViewModel) {
     if (showNotificationRationale) {
         AlertDialog(
             onDismissRequest = {},
+            icon = { Icon(Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
             title = { Text(stringResource(R.string.enable_notifications_title)) },
             text = { Text(stringResource(R.string.enable_notifications_body)) },
             confirmButton = {
@@ -201,6 +243,16 @@ private fun WelcomeScreen(modifier: Modifier, onCreate: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Surface(
+            modifier = Modifier.size(76.dp),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.primaryContainer
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(40.dp))
+            }
+        }
+        Spacer(Modifier.height(18.dp))
         Text(stringResource(R.string.welcome_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(10.dp))
         Text(stringResource(R.string.welcome_body), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -209,15 +261,7 @@ private fun WelcomeScreen(modifier: Modifier, onCreate: () -> Unit) {
     }
 }
 
-private data class NavItem(val route: String, val labelRes: Int) {
-    fun labelSymbol(): String = when (route) {
-        Routes.TODAY -> "●"
-        Routes.TIMETABLE -> "▦"
-        Routes.ANALYTICS -> "◔"
-        Routes.REPORTS -> "▤"
-        else -> "⚙"
-    }
-}
+private data class NavItem(val route: String, val labelRes: Int, val icon: ImageVector)
 
 private object Routes {
     const val TODAY = "today"
